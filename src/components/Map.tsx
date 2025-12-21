@@ -101,6 +101,7 @@ function LongPressHandler({
     startPosRef.current = null
   }, [setPressPosition])
 
+  // Handle mouse events
   useMapEvents({
     mousedown: (e) => {
       // Ignore if clicking on a marker or popup
@@ -129,39 +130,57 @@ function LongPressHandler({
         }
       }
     },
-    // Touch events for mobile
-    touchstart: (e) => {
-      if ((e.originalEvent.target as HTMLElement).closest('.leaflet-marker-icon, .leaflet-popup')) {
+  })
+
+  // Handle touch events via native DOM for mobile support
+  useEffect(() => {
+    const container = map.getContainer()
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if ((e.target as HTMLElement).closest('.leaflet-marker-icon, .leaflet-popup')) {
         return
       }
 
-      const touch = e.originalEvent.touches[0]
+      const touch = e.touches[0]
+      const latlng = map.containerPointToLatLng([touch.clientX - container.getBoundingClientRect().left, touch.clientY - container.getBoundingClientRect().top])
+
       startPosRef.current = { x: touch.clientX, y: touch.clientY }
-      setPressPosition({ lat: e.latlng.lat, lng: e.latlng.lng })
+      setPressPosition({ lat: latlng.lat, lng: latlng.lng })
 
       timerRef.current = setTimeout(() => {
         if (onLongPress && startPosRef.current) {
-          // Vibrate on mobile if supported
           if (navigator.vibrate) {
             navigator.vibrate(50)
           }
-          onLongPress(e.latlng.lat, e.latlng.lng)
+          onLongPress(latlng.lat, latlng.lng)
         }
         clearTimer()
       }, LONG_PRESS_DURATION)
-    },
-    touchend: clearTimer,
-    touchmove: (e) => {
+    }
+
+    const handleTouchEnd = () => clearTimer()
+
+    const handleTouchMove = (e: TouchEvent) => {
       if (startPosRef.current && timerRef.current) {
-        const touch = e.originalEvent.touches[0]
+        const touch = e.touches[0]
         const dx = touch.clientX - startPosRef.current.x
         const dy = touch.clientY - startPosRef.current.y
         if (Math.sqrt(dx * dx + dy * dy) > 10) {
           clearTimer()
         }
       }
-    },
-  })
+    }
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true })
+    container.addEventListener('touchend', handleTouchEnd)
+    container.addEventListener('touchmove', handleTouchMove, { passive: true })
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('touchend', handleTouchEnd)
+      container.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [map, onLongPress, clearTimer, setPressPosition])
 
   // Cleanup on unmount
   useEffect(() => {
