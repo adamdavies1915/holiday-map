@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model House {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  address     String?  @db.VarChar(500)
+  latitude    Float
+  longitude   Float
+  imagePath   String?  @map("image_path") @db.VarChar(500)
+  createdBy   String?  @map("created_by") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  votes       Vote[]
+
+  @@map("houses")
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  houseId   String   @map("house_id")
+  browserId String   @map("browser_id") @db.VarChar(255)
+  value     Int      // 1 = upvote, -1 = downvote
+  createdAt DateTime @default(now()) @map("created_at")
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  @@unique([houseId, browserId])
+  @@map("votes")
+}
